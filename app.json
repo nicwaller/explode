@@ -1,0 +1,13 @@
+{
+  "name": "Explode",
+  "description": "Realtime multi-player artillery",
+  "repository": "https://github.com/nicwaller/explode",
+  "logo": "",
+  "keywords": ["node", "multiplayer", "colyseus"],
+  "env": {
+    "NPM_CONFIG_PRODUCTION": {
+      "description": "Leave as 'false' to install required devDependencies.",
+      "value": "false"
+    }
+  }
+}

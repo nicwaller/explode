@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Game</title>
+      <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+      <script type="text/javascript" src="https://unpkg.com/colyseus.js@^0.14.0/dist/colyseus.js"></script>
+      <script src="large/pixi.min.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+  </head>
+  <body>
+
+<script type="text/javascript">
+</script>
+
+<script>
+    const host = window.document.location.host.replace(/:.*/, '');
+    const client = new Colyseus.Client(location.protocol.replace("http", "ws") + "//" + host + (location.port ? ':' + location.port : ''));
+
+    const app = new PIXI.Application({width: 1000, height: 600, antialias: true});
+    document.body.appendChild(app.view);
+    app.renderer.backgroundColor = 0x333333;
+
+    PIXI.loader
+        .add([
+            "images/halfdome.png",
+            "images/shot.png",
+        ])
+        .load(setup);
+
+    async function setup() {
+
+        const room = await client.joinOrCreate("war");
+
+        room.state.tanks.onAdd = (tank) => {
+            const sprite = new PIXI.Sprite(PIXI.loader.resources["images/halfdome.png"].texture);
+            [sprite.x, sprite.y] = [tank.x, tank.y];
+            [sprite.width, sprite.height] = [tank.width, tank.height];
+            app.stage.addChild(sprite);
+
+            const turret = new PIXI.Graphics().lineStyle(3, 0x00FF00);
+            app.stage.addChild(turret);
+            turret.pivot.set(0, 0);
+            turret.moveTo(0, 0);
+            turret.lineTo(0, 0 - tank.firePower/10);
+
+            tank.onChange = (changes) => {
+                [sprite.x, sprite.y] = [tank.x, tank.y];
+                turret.rotation = (0 - tank.fireAngle) + (3.14159/2);
+                turret.position.set(tank.x + tank.width/2, tank.y);
+                turret.scale.set(1, tank.firePower/250);
+            }
+
+            tank.onRemove = () => {
+                app.stage.removeChild(sprite);
+                app.stage.removeChild(turret);
+            }
+        }
+
+        room.state.shots.onAdd = (shot) => {
+            const sprite = new PIXI.Sprite(PIXI.loader.resources["images/shot.png"].texture);
+            [sprite.x, sprite.y] = [shot.x, shot.y];
+            [sprite.width, sprite.height] = [shot.width, shot.height];
+            app.stage.addChild(sprite);
+
+            // //    <circle cx="50" cy="50" r="40" stroke="black" stroke-width="3" fill="red" />
+            // const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            // circle.setAttributeNS(null, "cx", `${shot.x}`);
+            // circle.setAttributeNS(null, "cy", `${shot.y}`);
+            // circle.setAttributeNS(null, "r", `${shot.width/2}`);
+            // circle.setAttributeNS(null, "fill", `rgb(${shot.colour[0]},${shot.colour[1]},${shot.colour[2]})`);
+            // circle.setAttribute('class', 'shot sprite');
+            // vectorCanvas.appendChild(circle);
+
+            shot.onChange = (changes) => {
+                [sprite.x, sprite.y] = [shot.x, shot.y];
+            }
+
+            shot.onRemove = () => {
+                app.stage.removeChild(sprite);
+            }
+
+            // each player should have their own colour
+            // with slight variations on each shot
+            // and clouds should wipe away the smoke trails
+
+            // I thought it would be clever to have different fps in the client
+            // vs. the server sync speed, but if the client is compounding gravity at a higher
+            // rate than the server, that's going to lead to animation de-sync. bleh. -NW
+            // const fps = 25;
+            // setInterval(() => {
+            //     shot.x += shot.vx / fps;
+            //     shot.y += shot.vy / fps;
+            //     shot.vy += room.state.gravity / fps;
+            //     sprite.style.left = shot.x + "px";
+            //     sprite.style.top = shot.y + "px";
+            // }, 1000/fps);
+        }
+
+        // room.state.terrain.onChange = (x) => {
+        //     drawTerrain();
+        // }
+        const terrain = [0];
+        room.state.onChange = (x) => {
+            terrain.splice(0, terrain.length, ...room.state.terrain.split(',').map(s => parseInt(s, 10)))
+            console.log(terrain);
+
+            const terrainGfx = new PIXI.Graphics().lineStyle(3, 0x00FF00);
+            app.stage.addChild(terrainGfx);
+            terrainGfx.moveTo(0, room.state.height);
+            for (const [ix, pt] of terrain.entries()) {
+                terrainGfx.lineTo(ix, pt);
+            }
+
+        //     console.log(...room.state.terrain);
+        //     for (let i = 0; i < room.state.terrain.length; i++) {
+        //         raster.moveTo(i, room.state.height);
+        //         raster.strokeStyle = `#FF0000`;
+        //         raster.lineWidth = 1;
+        //         // raster.lineTo(i, room.state.terrain[i]);
+        //         raster.lineTo(i, 0);
+        //         raster.stroke();
+        //     }
+        }
+
+
+        // function newSpriteBox(width, height) {
+        //     const spriteBox = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        //     spriteBox.setAttributeNS(null, "width", width.toString());
+        //     spriteBox.setAttributeNS(null, "height", height.toString());
+        //     spriteBox.x = 20;
+        //     spriteBox.y = 40;
+        //     return spriteBox;
+        // }
+
+        // function drawTankInto(tank, spriteBox) {
+        //     const w = tank.width;
+        //     const h = tank.height;
+        //
+        //     const dome = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        //     dome.setAttributeNS(null, "d", `M 0 ${h} C 0 -10, ${w} -10, ${w} ${h}`);
+        //     dome.setAttributeNS(null, "fill", `rgb(${tank.colour[0]},${tank.colour[1]},${tank.colour[2]})`);
+        //     dome.setAttribute('class', 'tank sprite');
+        //     spriteBox.appendChild(dome);
+        // }
+
+        // room.state.tanks.onRemove = (tank, sessionId) => {
+        //     document.body.removeChild(tanks[sessionId]);
+        //     delete tanks[sessionId];
+        // }
+
+        window.addEventListener("keydown", function (event) {
+            switch (event.key) {
+                case 'ArrowUp':
+                    changePower(+10);
+                    break;
+                case 'ArrowDown':
+                    changePower(-10);
+                    break;
+                case 'ArrowLeft':
+                    moveTurret(0.05);
+                    break;
+                case 'ArrowRight':
+                    moveTurret(-0.05);
+                    break;
+                case 'j':
+                    moveMe(-1, 0);
+                    break;
+                case 'k':
+                    moveMe(1, 0);
+                    break;
+                case ' ':
+                    fire();
+                    break;
+                default:
+                    // console.log(event.key);
+                    return;
+            }
+            event.preventDefault();
+        });
+
+        function moveTurret(delta) {
+            room.send("moveTurret", delta)
+        }
+
+        function changePower(delta) {
+            room.send("changePower", delta)
+        }
+
+        function fire() {
+            room.send("fire");
+        }
+
+        function moveMe(dx, dy, speed = 10) {
+            room.send("move", { dx: dx * speed, dy: dy * speed });
+        }
+    }
+
+</script>
+</body></html>
